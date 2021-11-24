@@ -1,0 +1,3 @@
+train losses [0.53938926 0.53909273 0.54068381 0.53822051]
+cv_loses [0.54650166 0.54045484 0.53343731 0.53965805]
+manualcv loss on the hold out final test set:0.60668975

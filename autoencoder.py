@@ -13,15 +13,16 @@ encoding_dim = 32
 input_size = 65
 input_data = keras.Input(shape=(65,))
 print("inpuyt data",input_data)
-encoded = layers.Dense(input_size,input_dim=input_size,activation='relu')(input_data)
-# encoded = layers.Dense(130,activation='relu')(input_data)
-# encoded = layers.Dense(85,activation='relu')(input_data)
 
-# decoded = layers.Dense(75, activation='relu')(encoded)
-# decoded = layers.Dense(130, activation='relu')(decoded)
-# decoded = layers.Dense(input_size, activation='relu')(encoded)
+encoded = layers.Dense(input_size,input_dim=input_size)(input_data)
+encoded = layers.Dense(260,activation='relu')(encoded)
+encoded = layers.Dense(130,activation='relu')(encoded)
 
-autoencoder = keras.Model(input_data, encoded)
+decoded = layers.Dense(130, activation='relu')(encoded)
+decoded = layers.Dense(260, activation='relu')(decoded)
+decoded = layers.Dense(input_size, activation='relu')(decoded)
+
+autoencoder = keras.Model(input_data, decoded)
 
 autoencoder.compile(optimizer='adam', loss=mean_squared_logarithmic_error)
 
@@ -60,7 +61,7 @@ col_train = list(processed_X_full.columns)
 mat_train_scaled = pd.DataFrame(min_max_scaler.transform(mat_train), columns=col_train)
 
 # arr = np.expand_dims(arr, axis=2)
-autoencoder.fit(mat_train_scaled, mat_train_scaled, epochs=100, batch_size=100, shuffle=True,validation_data=(mat_train_scaled,mat_train_scaled))
+autoencoder.fit(mat_train_scaled, mat_train_scaled, epochs=2000, batch_size=100, shuffle=True,validation_data=(mat_train_scaled,mat_train_scaled))
 mat_train_prediction = autoencoder.predict(mat_train_scaled)
 prediction_df = pd.DataFrame(mat_train_prediction)
 prediction_df.columns = processed_X_full.columns

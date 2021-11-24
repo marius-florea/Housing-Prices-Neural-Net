@@ -18,7 +18,7 @@ from processing_utils import *
 from features import *
 
 train_original = pd.read_csv('../data/train.csv', index_col='Id')
-# generated_df = pd.read_csv('5000itlotsOfZeros2ReluLayers.csv', index_col='Id')
+generated_df = pd.read_csv('syntetic_data_from_ae.csv', index_col='Id')
 
 # train = train.select_dtypes(exclude=['object'])
 # train.fillna(0,inplace=True)
@@ -69,8 +69,9 @@ preprocessor_test = get_preprocessor(numerical_cols, categorical_cols)
 processed_X_full = pd.DataFrame(preprocessor_train.fit_transform(train_na_filled))
 processed_X_full.columns = train_na_filled.columns
 
-# frame = pd.concat([processed_X_full,generated_df], axis=0, ignore_index=True)
-# processed_X_full = frame
+frame = pd.concat([processed_X_full,generated_df], axis=0, ignore_index=True)
+processed_X_full = frame
+processed_X_full = processed_X_full.sample(frac=1).reset_index(drop=True)
 
 
 processed_X_test = pd.DataFrame(preprocessor_test.fit_transform(test_na_filled))
@@ -126,6 +127,11 @@ prepro_test.fit(mat_test)# or prepro_test.fit(mat_test) ??
 
 train = pd.DataFrame(prepro.transform(mat_train), columns=col_train)
 test = pd.DataFrame(prepro_test.transform(mat_test),columns=col_train_bis)
+
+#minimized syntetic data
+# train_syntetic_data = pd.read_csv('minimized_predictions_from_ae.csv', index_col='Id')
+# train = pd.concat([train,train_syntetic_data])
+
 
 print(train.head())
 
@@ -215,63 +221,64 @@ def manual_cv(x_train_cross_val, y_train_cross_val, model,epochs=120,batch_size=
 
     train_loses = np.zeros(0)
     cv_losses = np.zeros(0)
-    for i in range(2):#wtf delete or comment
-        kf = KFold(n_splits=4, random_state=np.random.randint(10000*(9-i)))
-        for train_index, test_index in kf.split(x_train_cross_val,y_train_cross_val):
-            x_train, x_validation = training_set_selection.iloc[train_index], training_set_selection.iloc[test_index]
-            y_train, y_validation = y_label.iloc[train_index], y_label.iloc[test_index]
+    # for i in range(2):#wtf delete or comment
+    i=1
+    kf = KFold(n_splits=4, random_state=np.random.randint(10000*(9-i)))
+    for train_index, test_index in kf.split(x_train_cross_val,y_train_cross_val):
+        x_train, x_validation = training_set_selection.iloc[train_index], training_set_selection.iloc[test_index]
+        y_train, y_validation = y_label.iloc[train_index], y_label.iloc[test_index]
 
-            # y_train = pd.DataFrame(y_train, columns=[LABEL])
-            # training_set = pd.DataFrame(x_train, columns= FEATURES).merge(y_train, left_index=True,
-            #                                                           right_index=True)
-            #
-            # # Training for submission
-            # training_sub = training_set[col_train]
-            #
-            # # Same thing but for the test set
-            y_validation = pd.DataFrame(y_validation, columns= [LABEL])
-            validation_set = pd.DataFrame(x_validation, columns=FEATURES).merge(y_validation, left_index=True,
-                                                                                right_index=True)
-            # print(validation_set.head())
+        # y_train = pd.DataFrame(y_train, columns=[LABEL])
+        # training_set = pd.DataFrame(x_train, columns= FEATURES).merge(y_train, left_index=True,
+        #                                                           right_index=True)
+        #
+        # # Training for submission
+        # training_sub = training_set[col_train]
+        #
+        # # Same thing but for the test set
+        y_validation = pd.DataFrame(y_validation, columns= [LABEL])
+        validation_set = pd.DataFrame(x_validation, columns=FEATURES).merge(y_validation, left_index=True,
+                                                                            right_index=True)
+        # print(validation_set.head())
 
 
-            # feature_cols = training_set[FEATURES]
-            # labels = training_set[LABEL].values
+        # feature_cols = training_set[FEATURES]
+        # labels = training_set[LABEL].values
 
-            model.fit(np.array(x_train),np.array(y_train), epochs=epochs, batch_size=batch_size,verbose=0)
-            loss = model.evaluate(np.array(x_train), np.array(y_train))
-            print(model.metrics_names,":",loss)
-            train_loses = np.append(train_loses,loss[0])
-            # Predictions
-            # feature_cols_test = validation_set[FEATURES]
-            # labels_test = validation_set[LABEL].values
+        model.fit(np.array(x_train),np.array(y_train), epochs=epochs, batch_size=batch_size,verbose=0)
+        loss = model.evaluate(np.array(x_train), np.array(y_train))
+        print(model.metrics_names,":",loss)
+        train_loses = np.append(train_loses,loss[0])
+        # Predictions
+        # feature_cols_test = validation_set[FEATURES]
+        # labels_test = validation_set[LABEL].values
 
-            # y = model.predict(np.array(x_validation))
-            # predictions = list(itertools.islice(y, x_validation.shape[0]))
+        # y = model.predict(np.array(x_validation))
+        # predictions = list(itertools.islice(y, x_validation.shape[0]))
 
-            validation_data_loss = model.evaluate(np.array(x_validation),np.array(y_validation))
-            print("validation data loss",validation_data_loss)
-            cv_losses = np.append(cv_losses,validation_data_loss[0])
+        validation_data_loss = model.evaluate(np.array(x_validation),np.array(y_validation))
+        print("validation",model.metrics_names,validation_data_loss)
+        cv_losses = np.append(cv_losses,validation_data_loss[0])
 
-            plot = False
-            if plot:
-                predictions = prepro_y.inverse_transform(np.array(predictions).reshape(len(predictions),1))
-                reality = pd.DataFrame(prepro.inverse_transform(validation_set), columns=np.array(COLUMNS)).SalePrice
+        plot = False
+        if plot:
+            predictions = prepro_y.inverse_transform(np.array(predictions).reshape(len(predictions),1))
+            reality = pd.DataFrame(prepro.inverse_transform(validation_set), columns=np.array(COLUMNS)).SalePrice
 
-                matplotlib.rc('xtick', labelsize=10)
-                matplotlib.rc('ytick', labelsize=10)
+            matplotlib.rc('xtick', labelsize=10)
+            matplotlib.rc('ytick', labelsize=10)
 
-                fig, ax = plt.subplots(figsize=(10,10))
-                plt.style.use('ggplot')
-                plt.plot(predictions, reality, 'ro')
-                plt.xlabel('Predictions', fontsize=10)
-                plt.ylabel('Reality', fontsize=10)
+            fig, ax = plt.subplots(figsize=(10,10))
+            plt.style.use('ggplot')
+            plt.plot(predictions, reality, 'ro')
+            plt.xlabel('Predictions', fontsize=10)
+            plt.ylabel('Reality', fontsize=10)
 
-                plt.title('Predictions x Reality on dataset Test', fontsize = 30)
-                ax.plot([reality.min(), reality.max()], [reality.min(), reality.max()], 'k--', lw=4)
-                plt.show()
-                plt.close()
-                # print()
+            plt.title('Predictions x Reality on dataset Test', fontsize = 30)
+            ax.plot([reality.min(), reality.max()], [reality.min(), reality.max()], 'k--', lw=4)
+            plt.show()
+            plt.close()
+            # print()
 
     cv_losses_mean = cv_losses.mean()
     train_loses_string = "train losses " + str(train_loses)
@@ -307,7 +314,7 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 
     return fitted_model
 
-epochs = 1
+epochs = 400
 param_grid = {
               'epochs':[100,120,130],
               'batch_size':[50,100],
