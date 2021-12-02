@@ -6,6 +6,8 @@ import os
 import keras
 
 import itertools
+
+import pandas
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,9 +18,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from processing_utils import *
 from features import *
+from utils import *
 
 train_original = pd.read_csv('../data/train.csv', index_col='Id')
-generated_df = pd.read_csv('syntetic_data_from_ae.csv', index_col='Id')
+generated_df = pd.read_csv('syntetic_data_from_ae_less_rows_with_nans.csv', index_col='Id')
+
+# print("train data duplicates",train_original.duplicated().values.sum())
+# train_original = remove_rows_with_nans(train_original)
+
 
 # train = train.select_dtypes(exclude=['object'])
 # train.fillna(0,inplace=True)
@@ -175,31 +182,22 @@ def root_mean_squared_error(y_true, y_pred):
 
 def model_function(input_dimension,optimizer="adam",instantiate=False):
     def create_model():
-        l1 = 5*1e-4
-        l2 = 2.5*1e-4
+        l1 = 9*1e-4
+        l2 = 5*1e-4
+        kernel_initializer = 'glorot_uniform'
         model = Sequential()
-        model.add(Dense(input_dimension, input_dim=input_dimension, kernel_initializer='normal', activation='relu'))
-        model.add(Dense(100, kernel_initializer='normal', kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2),activation='relu'))
-        model.add(Dense(120, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dense(input_dimension, input_dim=input_dimension, kernel_initializer=kernel_initializer, activation='relu'))
+        # model.add(Dense(130, kernel_initializer=kernel_initializer, kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2),activation='relu'))
         # model.add(Dropout(dropout_rate2))
-        model.add(Dense(150, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-        # model.add(Dense(180, kernel_initializer='normal', activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-        # model.add(Dense(190, kernel_initializer='normal', activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-        # model.add(Dense(180, kernel_initializer='normal', activation='relu'))
-
-        model.add(Dense(150, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-
-        model.add(Dense(120, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-        model.add(Dense(100, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dense(80, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dense(40, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dense(20, kernel_initializer='normal',kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dense(1, kernel_initializer='normal'))
+        # model.add(Dense(120, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dropout(dropout_rate2))
+        model.add(Dense(100, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dropout(dropout_rate2))
+        model.add(Dense(65, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dropout(dropout_rate2))
+        # model.add(Dense(40, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        # model.add(Dense(20, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dense(1, kernel_initializer=kernel_initializer))
         #compile model
         model.compile(metrics=['accuracy'],loss='binary_crossentropy',optimizer=optimizer)
         return model
@@ -288,6 +286,8 @@ def manual_cv(x_train_cross_val, y_train_cross_val, model,epochs=120,batch_size=
 
     textfile = open(textfile_name, "w")
     textfile.writelines([train_loses_string,"\n",cv_losses_string,"\n"])
+    textfile.writelines(["cv_loss mean",str(cv_losses_mean)])
+    textfile.writelines(["epochs",str(epochs)])
     textfile.close()
 
     print("cv loss mean:",cv_losses_mean)
@@ -314,7 +314,7 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 
     return fitted_model
 
-epochs = 400
+epochs = 300
 param_grid = {
               'epochs':[100,120,130],
               'batch_size':[50,100],
@@ -339,14 +339,15 @@ y_prediction_test = fitted_model.predict(np.array(x_holdout_test))
 loss = binary_crossentropy(np.array(y_test),y_prediction_test)
 loss_on_holdoutset_text = ""
 if do_manual_cv:
-    loss_manual= loss.numpy().mean()
+    loss_manual = loss.numpy().mean()
     loss_on_holdoutset_text = "manualcv loss on the hold out final test set:" + str(loss_manual)
 else:
     loss_on_holdoutset_text = "gridsearchcv loss on the hold out final test set:" + str(loss)
 
 print(loss_on_holdoutset_text)
 with open(textfile_name,'a') as f:
-    f.write(loss_on_holdoutset_text)
+    f.write(loss_on_holdoutset_text+"\n")
+    model.summary(print_fn=lambda x: f.write(x + '\n'))
 
 
 # prediction for sumbmission

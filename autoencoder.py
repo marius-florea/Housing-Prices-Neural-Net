@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from keras.losses import *
 import tensorflow
+from utils import *
 
 print("tensorflow",tensorflow.version.VERSION)
 print("keras version",keras.__version__)
@@ -27,7 +28,7 @@ autoencoder = keras.Model(input_data, decoded)
 autoencoder.compile(optimizer='adam', loss=mean_squared_logarithmic_error)
 
 train_original = pd.read_csv('../data/train.csv', index_col='Id')
-
+# train_original = remove_rows_with_nans(train_original)
 numerical_cols = get_high_corelated_numerical_features()
 categorical_cols = get_choosen_categorical_features()
 
@@ -65,7 +66,7 @@ autoencoder.fit(mat_train_scaled, mat_train_scaled, epochs=2000, batch_size=100,
 mat_train_prediction = autoencoder.predict(mat_train_scaled)
 prediction_df = pd.DataFrame(mat_train_prediction)
 prediction_df.columns = processed_X_full.columns
-
+prediction_df.to_csv("syntetic_data_from_ae_less_rows_with_nans.csv", index_label='Id')
 
 print("")
 
