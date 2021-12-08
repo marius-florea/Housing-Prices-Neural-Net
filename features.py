@@ -54,3 +54,27 @@ def get_choosen_categorical_features():
                         # 'Alley','Fence'
                      ]
     return cols
+
+import pandas as pd
+#4 best margin till now
+unique_margin = 4
+def get_numerical_features_from_df_with_margin(df:pd.DataFrame):
+    # Select numerical columns
+    numerical_cols = [cname for cname in df.columns if
+                      (df[cname].dtype in ['int64', 'float64']
+                       and df[cname].nunique() > unique_margin)
+                      ]
+    numerical_cols.remove('SalePrice')
+    return numerical_cols
+
+def get_categorical_features_from_df_with_margin(df:pd.DataFrame):
+    # "Cardinality" means the number of unique values in a column
+    # Select categorical co lumns with relatively low cardinality (convenient but arbitrary)
+    categorical_cols = [cname for cname in df.columns if
+                        (df[cname].nunique() > unique_margin and
+                         df[cname].dtype == "object")]
+    return categorical_cols
+
+
+
+

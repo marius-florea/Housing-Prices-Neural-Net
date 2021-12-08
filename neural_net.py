@@ -21,8 +21,7 @@ from features import *
 from utils import *
 
 train_original = pd.read_csv('../data/train.csv', index_col='Id')
-generated_df = pd.read_csv('syntetic_data_from_ae_less_rows_with_nans.csv', index_col='Id')
-
+print(train_original.nunique())
 # print("train data duplicates",train_original.duplicated().values.sum())
 # train_original = remove_rows_with_nans(train_original)
 
@@ -38,19 +37,9 @@ y_list =['SalePrice']
 Y_train_original = train_original[y_list]
 # train_original.drop(['SalePrice'], axis=1, inplace=True)
 
-numerical_cols = get_high_corelated_numerical_features()
-categorical_cols = get_choosen_categorical_features()
+numerical_cols = get_numerical_features_from_df_with_margin(train_original)#get_high_corelated_numerical_features()
+categorical_cols = get_categorical_features_from_df_with_margin(train_original)#get_choosen_categorical_features()
 
-# "Cardinality" means the number of unique values in a column
-# Select categorical co lumns with relatively low cardinality (convenient but arbitrary)
-# categorical_cols = [cname for cname in train_original.columns if
-#                     train_original[cname].nunique() < 15 and
-#                     train_original[cname].dtype == "object"]
-
-# Select numerical columns
-# numerical_cols = [cname for cname in train_original.columns if
-#                 train_original[cname].dtype in ['int64', 'float64']]
-# numerical_cols.remove('SalePrice')
 
 my_cols = numerical_cols + categorical_cols  #+ numeric_categorical_cols
 my_cols_with_saleprice = my_cols + ['SalePrice']
@@ -75,37 +64,49 @@ preprocessor_test = get_preprocessor(numerical_cols, categorical_cols)
 
 processed_X_full = pd.DataFrame(preprocessor_train.fit_transform(train_na_filled))
 processed_X_full.columns = train_na_filled.columns
-
-frame = pd.concat([processed_X_full,generated_df], axis=0, ignore_index=True)
-processed_X_full = frame
-processed_X_full = processed_X_full.sample(frac=1).reset_index(drop=True)
-
-
 processed_X_test = pd.DataFrame(preprocessor_test.fit_transform(test_na_filled))
 processed_X_test.columns = test_na_filled.columns
+
+from sklearn.feature_selection import VarianceThreshold
+variance_threshold = 0.0
+if variance_threshold > 0.0:
+    varianceThreshold = VarianceThreshold(variance_threshold)
+    processed_X_full_selection_arr = varianceThreshold.fit_transform(processed_X_full)
+    print("new shape ",processed_X_full_selection_arr.shape)
+    print(processed_X_full.shape)
+    processed_X_full_selection = pd.DataFrame(processed_X_full_selection_arr,columns=varianceThreshold.get_feature_names_out())
+    processed_X_full = processed_X_full_selection
+    #TODO: here the cols for test were choosen based on the cols from train
+    #this could have some bias pls verify
+    # processed_X_full = processed_X_full.sample(frac=1).reset_index(drop=True)
+    variance_selection_train_columns = list(processed_X_full.columns)
+    variance_selection_train_columns.remove('SalePrice')
+    variance_selection_test_columns = variance_selection_train_columns
+    processed_X_test = processed_X_test[variance_selection_test_columns]
+
+
+
 
 
 # X_train_final = processed_X_full
 # print(X_train_final.shape)
 # print(train_modified.shape)
 
-
-
-
 # In this small part we will isolate the outliers with an IsolationFores
 from sklearn.ensemble import IsolationForest
 
-clf = IsolationForest(max_samples=100, random_state=42)
-clf.fit(processed_X_full)
-y_noano = clf.predict(processed_X_full)
-y_noano = pd.DataFrame(y_noano, columns=['Top'])
-# y_noano[y_noano['Top'] == 1].index.values
+# clf = IsolationForest(max_samples=100, random_state=42)
+# clf.fit(processed_X_full)
+# y_noano = clf.predict(processed_X_full)
+# y_noano = pd.DataFrame(y_noano, columns=['Include'])
+# # y_noano[y_noano['Top'] == 1].index.values
+# train = processed_X_full.iloc[y_noano[y_noano['Include'] == 1].index.values]
 
-train = processed_X_full.iloc[y_noano[y_noano['Top'] == 1].index.values]
+train = processed_X_full
 test = processed_X_test
-train.reset_index(drop=True, inplace=True)
-print("number of outliers:",y_noano[y_noano['Top'] == -1].shape[0])
-print("number of rows without outliers",train.shape[0])
+# train.reset_index(drop=True, inplace=True)
+# print("number of outliers:",y_noano[y_noano['Top'] == -1].shape[0])
+# print("number of rows without outliers",train.shape[0])
 
 print(train.head(10))
 
@@ -133,6 +134,15 @@ prepro_test = MinMaxScaler()
 prepro_test.fit(mat_test)# or prepro_test.fit(mat_test) ??
 
 train = pd.DataFrame(prepro.transform(mat_train), columns=col_train)
+
+#add/remove these lines for syntetic data
+# generated_df = pd.read_csv('syntetic_data_from_ae_2.csv', index_col='Id')
+# frame = pd.concat([train,generated_df], axis=0, ignore_index=True)
+# train = frame
+
+train = train.sample(frac=1).reset_index(drop=True)
+
+
 test = pd.DataFrame(prepro_test.transform(mat_test),columns=col_train_bis)
 
 #minimized syntetic data
@@ -221,7 +231,7 @@ def manual_cv(x_train_cross_val, y_train_cross_val, model,epochs=120,batch_size=
     cv_losses = np.zeros(0)
     # for i in range(2):#wtf delete or comment
     i=1
-    kf = KFold(n_splits=4, random_state=np.random.randint(10000*(9-i)))
+    kf = KFold(n_splits=4)#, random_state=np.random.randint(10000*(9-i)))
     for train_index, test_index in kf.split(x_train_cross_val,y_train_cross_val):
         x_train, x_validation = training_set_selection.iloc[train_index], training_set_selection.iloc[test_index]
         y_train, y_validation = y_label.iloc[train_index], y_label.iloc[test_index]
@@ -285,9 +295,11 @@ def manual_cv(x_train_cross_val, y_train_cross_val, model,epochs=120,batch_size=
     print(cv_losses_string)
 
     textfile = open(textfile_name, "w")
-    textfile.writelines([train_loses_string,"\n",cv_losses_string,"\n"])
-    textfile.writelines(["cv_loss mean",str(cv_losses_mean)])
-    textfile.writelines(["epochs",str(epochs)])
+    textfile.writelines([train_loses_string,"\n",cv_losses_string])
+    textfile.writelines(["\n cv_loss mean",str(cv_losses_mean)])
+    textfile.writelines(["\n epochs",str(epochs)])
+    textfile.writelines(["\n uniqeue margin",str(unique_margin)])
+    textfile.writelines(["\n variance threshold",str(variance_threshold)])
     textfile.close()
 
     print("cv loss mean:",cv_losses_mean)
@@ -308,16 +320,17 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
                       n_jobs=-1,
                       # scoring=scorer,
                       verbose=2)
-    fitted_model = gs.fit(x_train_cross_val,y_train_cross_val)
+    gs = gs.fit(x_train_cross_val,y_train_cross_val)
     print("gs best params",gs.best_params_)
     print("gs best score", gs.best_score_)
 
-    return fitted_model
+    return gs
 
-epochs = 300
+epochs = 450
+batch_size = 100
 param_grid = {
-              'epochs':[100,120,130],
-              'batch_size':[50,100],
+              'epochs':[150,300,450],
+              'batch_size':[100],
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
               # 'activation' :          ['relu', 'elu']
@@ -329,12 +342,14 @@ fitted_model: Sequential
 if do_manual_cv:
     input_dim = len(feature_cols)
     model = model_function(input_dimension=input_dim,instantiate=True)
-    fitted_model = manual_cv(x_train_cross_val,y_train_cross_val,model,epochs=epochs,batch_size=50)
+    fitted_model = manual_cv(x_train_cross_val,y_train_cross_val,model,epochs=epochs,batch_size=batch_size)
+    y_prediction_test = fitted_model.predict(np.array(x_holdout_test))
 else:
-    fitted_model = grid_cv(x_train_cross_val,y_train_cross_val,param_grid,cv=5)
+    gs = grid_cv(x_train_cross_val,y_train_cross_val,param_grid,cv=5)
+    model = gs.estimator.build_fn()
+    y_prediction_test = gs.predict(np.array(x_holdout_test))
 
 # loss = fitted_model.evaluate(np.array(x_test), np.array(y_test))
-y_prediction_test = fitted_model.predict(np.array(x_holdout_test))
 # loss = mean_absolute_error(np.array(y_test),y_prediction_test)
 loss = binary_crossentropy(np.array(y_test),y_prediction_test)
 loss_on_holdoutset_text = ""
@@ -346,12 +361,16 @@ else:
 
 print(loss_on_holdoutset_text)
 with open(textfile_name,'a') as f:
-    f.write(loss_on_holdoutset_text+"\n")
+    f.write("\n"+loss_on_holdoutset_text+"\n")
     model.summary(print_fn=lambda x: f.write(x + '\n'))
 
 
 # prediction for sumbmission
-y_predict = fitted_model.predict(np.array(test))
+if do_manual_cv:
+    y_predict = fitted_model.predict(np.array(test))
+else:
+    y_predict = gs.predict(np.array(test))
+
 
 def to_submit(pred_y, name_out):
     y_predict = list(itertools.islice(pred_y,test.shape[0]))
