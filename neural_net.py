@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
-import keras
+from tensorflow import keras
 
 import itertools
 
@@ -22,31 +22,30 @@ from utils import *
 from Lot_Frontage_Filler import *
 import numpy as np
 
-train_original = pd.read_csv('../data/train.csv', index_col='Id')
-# print("train data duplicates",train_original.duplicated().values.sum())
 # train_original = remove_rows_with_nans(train_original)
 
+# train_original = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
+# test_original = pd.read_csv('../data/test.csv', index_col='Id', keep_default_na=False)
 
-# train = train.select_dtypes(exclude=['object'])
-# train.fillna(0,inplace=True)
-
-#columns with datatype and unique values
-# aa = pd.DataFrame([train_original.nunique().array,train_original.dtypes.array])
-# aa.columns = train_original.columns
-# b = aa.loc[0].le(4)
-# c = b.where(lambda x: x==True).dropna()
-# df_with_cols_less_4_uniques = aa[list(c.index)]
-
-
+train_original = pd.read_csv('../data/train.csv', index_col='Id')
 test_original = pd.read_csv('../data/test.csv', index_col='Id')
-fill_Lot_Frontage_Nans(train_original)
-fill_Lot_Frontage_Nans(test_original)
+
+# columns_with_true_nans = get_columns_with_true_nans(train_original)
+# columns_with_true_nans_minus_salePrice = columns_with_true_nans.remove('SalePrice')
+
+# columns_with_na_string = get_columns_with_na_string()
+# train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(to_replace=np.nan,value='NA')
+# test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(to_replace=np.nan, value='NA')
+
+# train_original.to_csv("train_processed.csv")
+# test_original.to_csv("test_processed.csv")
+
+# fill_Lot_Frontage_Nans(train_original)
+# fill_Lot_Frontage_Nans(test_original)
 
 train_nunique = train_original.nunique()
 test_nunique = test_original.nunique()
 
-train_description = train_original.describe()
-test_description = test_original.describe()
 # test = test_original.select_dtypes(exclude=['object'])
 # test.fillna(0,inplace=True)
 
@@ -242,11 +241,9 @@ random_state_nr = 42
 train = train.sample(frac=1, random_state=random_state_nr).reset_index(drop=True)
 test = test.sample(frac=1, random_state=random_state_nr).reset_index(drop=True)
 
-
 #minimized syntetic data
 # train_syntetic_data = pd.read_csv('minimized_predictions_from_ae.csv', index_col='Id')
 # train = pd.concat([train,train_syntetic_data])
-
 
 print(train.head())
 
@@ -264,11 +261,11 @@ y_label = train.SalePrice
 
 #Train and Test
 
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import *
-from keras.wrappers.scikit_learn import KerasRegressor
-from keras.losses import  *
+from tensorflow.keras.models import  Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import *
+from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+from tensorflow.keras.losses import *
 
 #model
 # dropout_rate0 = 0.05
@@ -295,20 +292,16 @@ def model_function(input_dimension,optimizer="adam",instantiate=False):
         model = Sequential()
         # input_shape = (input_dim,1)
         model.add(Dense(input_dimension,input_dim=input_dimension, kernel_initializer=kernel_initializer, activation='relu'))
-        # model.add(Dense(130, kernel_initializer=kernel_initializer, kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2),activation='relu'))
-        # model.add(Dropout(dropout_rate2))
-        # model.add(Dense(120, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
 
         #uncomment --->
         model.add(Dropout(dropout_rate2))
-        model.add(Dense(200, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dropout(dropout_rate2))
         model.add(Dense(100, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
+        model.add(Dropout(dropout_rate2))
+        model.add(Dense(65, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
         model.add(Dropout(dropout_rate2))
         # <---- uncomment
 
-        model.add(Dense(50, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-
+        # model.add(Dense(50, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
         model.add(Dense(1, kernel_initializer=kernel_initializer))
         #compile model
         model.compile(metrics=['accuracy'],loss='binary_crossentropy',optimizer=optimizer)
@@ -335,10 +328,10 @@ def get_dataset_from_pd_dataframe(x:pd.DataFrame, y:pd.DataFrame):
             )
         )
     )
-    dataset = dataset.batch(batch_size=1)
+    dataset = dataset.batch(batch_size=80)
     return dataset
 
-from keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping
 from CustomStopper import *
 
 def manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
@@ -348,14 +341,14 @@ def manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
 
     train_loses = np.zeros(0)
     cv_losses = np.zeros(0)
-    # for i in range(2):#wtf delete or comment
+    # for i in range(2):#wtf delete or comment was like this because gridsearch after finding the
+    # good params reruns the model on data again
     i = 1
     kf = KFold(n_splits=4)  # , random_state=np.random.randint(10000*(9-i)))
     earlyStopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=patience)
-    customStopper = CustomStopper(monitor='val_loss', mode='min',verbose=1,patience=patience,start_epoch=300)
-    print(tf.__version__)
-    print(tf.config.list_logical_devices())
-
+    customStopper = CustomStopper(monitor='val_loss', mode='min',verbose=0,patience=patience,start_epoch=200)
+    # print(tf.__version__)
+    # print(tf.config.list_logical_devices())
     for train_index, test_index in kf.split(x_train_cross_val, y_train_cross_val):
         x_train, x_validation = x_train_cross_val.iloc[train_index], x_train_cross_val.iloc[test_index]
         y_train, y_validation = y_train_cross_val.iloc[train_index], y_train_cross_val.iloc[test_index]
@@ -363,8 +356,8 @@ def manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
         train_dataset = get_dataset_from_pd_dataframe(x_train, y_train)
         validation_dataset = get_dataset_from_pd_dataframe(x_validation, y_validation)
 
-        model.fit(x=train_dataset,validation_data=validation_dataset, epochs=epochs, batch_size=batch_size, verbose=0,
-                  callbacks=customStopper)
+        model.fit(x=train_dataset, epochs=epochs,validation_data=validation_dataset, verbose=0,
+                  callbacks=[customStopper])
         loss = model.evaluate(np.array(x_train), np.array(y_train))
         print(model.metrics_names, ":", loss)
         train_loses = np.append(train_loses, loss[0])
@@ -473,7 +466,7 @@ def manual_cv(x_train_cross_val, y_train_cross_val, model,epochs=120,batch_size=
     return model
 
 from sklearn.model_selection import GridSearchCV
-from keras.wrappers.scikit_learn import KerasRegressor
+from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.metrics import make_scorer
 
 def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=root_mean_squared_error):
@@ -488,17 +481,17 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
                       cv=cv,
                       n_jobs=-1,
                       # scoring=scorer,
-                      verbose=2)
+                      verbose=0)
     gs = gs.fit(x_train_cross_val,y_train_cross_val)
     print("gs best params",gs.best_params_)
     print("gs best score", gs.best_score_)
 
     return gs
 
-epochs = 1600
+epochs = 1200
 batch_size = 80
 param_grid = {
-              'epochs':[1200,1400,1600],
+              'epochs':[800,1200],
               'batch_size':[80],
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
@@ -514,10 +507,14 @@ length = train_columns_length if train_columns_length > test_columns_length else
 if do_manual_cv:
     input_dim = len(feature_cols)
     model = model_function(input_dimension=input_dim,instantiate=True)
-    # fitted_model = manual_cv(x_train_cross_val, y_train_cross_val, model,
-    #                          epochs=epochs, batch_size=batch_size)
-    fitted_model = manual_cv_with_tfdataset(x_train_cross_val,y_train_cross_val,model,
-                                            epochs=epochs,batch_size=batch_size, patience=100)
+    train_with_stopping_rounds = False
+    if train_with_stopping_rounds:
+        fitted_model = manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
+                                                epochs=epochs, batch_size=batch_size, patience=150)
+    else:
+        fitted_model = manual_cv(x_train_cross_val, y_train_cross_val, model,
+                                 epochs=epochs, batch_size=batch_size)
+
     y_prediction_for_holdout_set = fitted_model.predict(np.array(x_holdout_set))
 else:
     gs = grid_cv(x_train_cross_val,y_train_cross_val,param_grid,cv=5)
