@@ -22,8 +22,9 @@ def get_preprocessor(numerical_cols, categorical_cols_definded_range, categorica
 
     categorical_transformer_definded_range = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant')),
+        ('ordinal', OrdinalEncoder())#TODO: remove when using dummies code
     ])
-
+    # variante with one h
     # one_hot_encoder = OneHotEncoder(handle_unknown='ignore')
     # numeric_transformer_one_hot = Pipeline(steps=[
     #     ('imputer', SimpleImputer(strategy='constant')),
@@ -36,9 +37,36 @@ def get_preprocessor(numerical_cols, categorical_cols_definded_range, categorica
         ('passthrough-numeric', 'passthrough', numerical_cols),
         ('categorical_transformer_definded_range', categorical_transformer_definded_range, categorical_cols_definded_range),
         ('categorical_transformer_over_15', categorical_transformer_over_15, categorical_cols_over_15_and_non_matching),
-        # ('cat2',numeric_transformer_one_hot,cols_for_one_hot_encoding)
+        # ('cat2',numeric_transformer_one_hot,cols_for_one_hot_encoding) # variante with one h
     ]
     if len(label_column) > 0:
+        transformers_list.append( ('passthrough-label', 'passthrough', label_column))
+
+    preprocessor = ColumnTransformer(
+        transformers=transformers_list, remainder="drop")
+    return preprocessor
+
+def get_preprocessor(numerical_cols, categorical_cols, label_column=''):
+    numerical_transformer = SimpleImputer(strategy='constant') # Your code here
+
+    # Preprocessing for categorical data
+    #
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant')),
+        ('ordinal', OrdinalEncoder())#OneHotEncoder(handle_unknown='ignore'))
+    ])
+
+    numeric_categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant')),
+        ('ordinal', OrdinalEncoder())
+    ])
+
+    # Bundle preprocessing for numerical and categorical data
+    transformers_list = [
+        ('passthrough-numeric', 'passthrough', numerical_cols),
+        ('cat', categorical_transformer, categorical_cols)
+    ]
+    if len(label_column)>0:
         transformers_list.append( ('passthrough-label', 'passthrough', label_column))
 
     preprocessor = ColumnTransformer(
