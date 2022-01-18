@@ -57,6 +57,33 @@ def get_choosen_categorical_features():
 
 import pandas as pd
 #4 best margin till now
+
+def get_columns_with_na_string():
+    return ['Alley', 'BsmtQual', 'BsmtCond', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinType2',
+                              'FireplaceQu', 'GarageType', 'GarageFinish', 'GarageQual', 'GarageCond', 'PoolArea',
+                              'Fence', 'MiscFeature','PoolQC']
+
+def get_columns_with_true_nans(df:pd.DataFrame):
+    columns = df.columns.to_list()
+    columns_with_na_string = get_columns_with_na_string()
+    columns_with_true_nans = [col for col in columns if col not in columns_with_na_string]
+    return columns_with_true_nans
+
+def get_numerical_features_from_df(df:pd.DataFrame):
+    # Select numerical columns
+    numerical_cols = [cname for cname in df.columns if
+                      df[cname].dtype in ['int64', 'float64']
+                      ]
+    numerical_cols.remove('SalePrice')
+    return numerical_cols
+
+def get_categorical_features_from_df(df:pd.DataFrame):
+    # Select numerical columns
+    categorical_cols = [cname for cname in df.columns if
+                      df[cname].dtype in ['object']
+                      ]
+    return categorical_cols
+
 unique_margin = 4
 def get_numerical_features_from_df_with_margin(df:pd.DataFrame):
     # Select numerical columns

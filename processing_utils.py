@@ -44,3 +44,4 @@ def get_preprocessor(numerical_cols, categorical_cols_definded_range, categorica
     preprocessor = ColumnTransformer(
         transformers=transformers_list, remainder="drop")
     return preprocessor
+
