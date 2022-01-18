@@ -21,3 +21,5 @@ Loses/1638381519.7969248.txt
 *.csv
 submission.csv
 submission.csv
+*.pyc
+*.csv
