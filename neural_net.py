@@ -1,4 +1,3 @@
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -22,26 +21,30 @@ from utils import *
 from Lot_Frontage_Filler import *
 import numpy as np
 
+def differentiate_NA_and_nans():
+    # differentiating NA from nan code - move to a function
+    train_original = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
+    test_original = pd.read_csv('../data/test.csv', index_col='Id', keep_default_na=False)
+    columns_with_true_nans = get_columns_with_true_nans(train_original)
+    train_original[columns_with_true_nans] = train_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
+    columns_with_true_nans.remove('SalePrice')
+    test_original[columns_with_true_nans] = test_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
+    train_original.to_csv("train_processed.csv")
+    test_original.to_csv("test_processed.csv")
+
+
 # train_original = remove_rows_with_nans(train_original)
+# differentiate_NA_and_nans()
+na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A", "NULL", "NaN", "n/a", "nan", "null"]
+#these csv's can;t be read well in open office after the processing
+train_original = pd.read_csv('train_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
+test_original = pd.read_csv('test_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
+# columns_with_na_string = get_columns_with_true_nans()
+# train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
+# test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
 
-# train_original = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
-# test_original = pd.read_csv('../data/test.csv', index_col='Id', keep_default_na=False)
-
-train_original = pd.read_csv('../data/train.csv', index_col='Id')
-test_original = pd.read_csv('../data/test.csv', index_col='Id')
-
-# columns_with_true_nans = get_columns_with_true_nans(train_original)
-# columns_with_true_nans_minus_salePrice = columns_with_true_nans.remove('SalePrice')
-
-# columns_with_na_string = get_columns_with_na_string()
-# train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(to_replace=np.nan,value='NA')
-# test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(to_replace=np.nan, value='NA')
-
-# train_original.to_csv("train_processed.csv")
-# test_original.to_csv("test_processed.csv")
-
-# fill_Lot_Frontage_Nans(train_original)
-# fill_Lot_Frontage_Nans(test_original)
+fill_Lot_Frontage_Nans(train_original)
+fill_Lot_Frontage_Nans(test_original)
 
 train_nunique = train_original.nunique()
 test_nunique = test_original.nunique()
@@ -163,15 +166,10 @@ if variance_threshold == 0.0 and False:
     processed_X_full = processed_X_full_selection
     #TODO: here the cols for test were choosen based on the cols from train
     #this could have some bias pls verify
-    # processed_X_full = processed_X_full.sample(frac=1).reset_index(drop=True)
     variance_selection_train_columns = list(processed_X_full.columns)
     variance_selection_train_columns.remove('SalePrice')
     variance_selection_test_columns = variance_selection_train_columns
     processed_X_test = processed_X_test[variance_selection_test_columns]
-
-
-
-
 
 # X_train_final = processed_X_full
 # print(X_train_final.shape)
@@ -239,7 +237,6 @@ test = pd.DataFrame(minmax_scaler_test.transform(mat_test), columns=columns_from
 
 random_state_nr = 42
 train = train.sample(frac=1, random_state=random_state_nr).reset_index(drop=True)
-test = test.sample(frac=1, random_state=random_state_nr).reset_index(drop=True)
 
 #minimized syntetic data
 # train_syntetic_data = pd.read_csv('minimized_predictions_from_ae.csv', index_col='Id')
@@ -488,10 +485,10 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 
     return gs
 
-epochs = 1200
+epochs = 1400
 batch_size = 80
 param_grid = {
-              'epochs':[800,1200],
+              'epochs':[1000,1200,1400,1600],
               'batch_size':[80],
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
@@ -507,7 +504,7 @@ length = train_columns_length if train_columns_length > test_columns_length else
 if do_manual_cv:
     input_dim = len(feature_cols)
     model = model_function(input_dimension=input_dim,instantiate=True)
-    train_with_stopping_rounds = False
+    train_with_stopping_rounds = True
     if train_with_stopping_rounds:
         fitted_model = manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
                                                 epochs=epochs, batch_size=batch_size, patience=150)
