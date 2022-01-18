@@ -67,8 +67,8 @@ for col in categorical_cols_unique_range_4_15:
     if train_original[col].nunique() == test_original[col].nunique():
         categorical_cols_matching_unique_count__range_4_15.append(col)
     else:
-        categorical_cols_matching_unique_count__range_4_15.append(col) #Temporary !! replace with line below
-        # categorical_cols_nonmatching_unique_count__range_4_15.append(col)
+        # categorical_cols_matching_unique_count__range_4_15.append(col) #Temporary !! replace with line below
+        categorical_cols_nonmatching_unique_count__range_4_15.append(col)
 
 my_cols = numerical_cols + categorical_cols_matching_unique_count__range_4_15 + \
           categorical_cols_nonmatching_unique_count__range_4_15 \
@@ -488,8 +488,8 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 epochs = 1400
 batch_size = 80
 param_grid = {
-              'epochs':[1000,1200,1400,1600],
-              'batch_size':[80],
+              'epochs':[1200,1400,1600],
+              'batch_size':[80,100],
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
               # 'activation' :          ['relu', 'elu']
@@ -504,7 +504,7 @@ length = train_columns_length if train_columns_length > test_columns_length else
 if do_manual_cv:
     input_dim = len(feature_cols)
     model = model_function(input_dimension=input_dim,instantiate=True)
-    train_with_stopping_rounds = True
+    train_with_stopping_rounds = False
     if train_with_stopping_rounds:
         fitted_model = manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
                                                 epochs=epochs, batch_size=batch_size, patience=150)
