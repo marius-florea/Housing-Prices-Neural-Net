@@ -20,6 +20,14 @@ from features import *
 from utils import *
 from Lot_Frontage_Filler import *
 import numpy as np
+def get_features_with_nr_of_nulls_larger_than(nrOfNulls: int):
+    m = train_original.eq('NA').sum()
+    nulls_in_train_df = train_original.eq('NA').sum()
+    nulls_in_test_df = test_original.eq('NA').sum()
+    train_labels = nulls_in_train_df[nulls_in_train_df > nrOfNulls].index.values
+    test_labels = nulls_in_test_df[nulls_in_test_df > nrOfNulls].index.values
+    intersection = np.intersect1d(test_labels,train_labels)
+    return intersection
 
 def differentiate_NA_and_nans():
     # differentiating NA from nan code - move to a function
@@ -33,6 +41,7 @@ def differentiate_NA_and_nans():
     test_original.to_csv("test_processed.csv")
 
 
+
 # train_original = remove_rows_with_nans(train_original)
 # differentiate_NA_and_nans()
 na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A", "NULL", "NaN", "n/a", "nan", "null"]
@@ -42,6 +51,13 @@ test_original = pd.read_csv('test_processed.csv', index_col='Id',na_values=na_va
 # columns_with_na_string = get_columns_with_true_nans()
 # train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
 # test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
+nrOfNulls = 1150
+features_with_many_nulls = get_features_with_nr_of_nulls_larger_than(nrOfNulls) #TODO with these features removed the score got worse!!!
+high_correlated_features = ['GarageCars','GarageYrBlt','TotRmsAbvGrd','TotalBsmtSF','BedroomAbvGr','BsmtFullBath']
+features_to_remove = np.append(high_correlated_features,features_with_many_nulls)
+#TODO uncomment to drop features to be removed
+# train_original.drop(labels=features_to_remove, axis=1, inplace=True)
+# test_original.drop(labels=features_to_remove, axis=1, inplace=True)
 
 fill_Lot_Frontage_Nans(train_original)
 fill_Lot_Frontage_Nans(test_original)
@@ -73,6 +89,7 @@ for col in categorical_cols_unique_range_4_15:
 my_cols = numerical_cols + categorical_cols_matching_unique_count__range_4_15 + \
           categorical_cols_nonmatching_unique_count__range_4_15 \
           + categorical_cols_unique_over_15
+
 my_cols_with_saleprice = my_cols + ['SalePrice']
 
 
@@ -127,7 +144,9 @@ def dataframe_feature_engineering_dummies(df:pd.DataFrame,preprocessor:ColumnTra
         new_df = pd.DataFrame(df_arr, columns=my_cols)
     df_with_dummies = pd.get_dummies(new_df,columns=categorical_cols_definded_range)
 
-    remaining_indexes = df_with_dummies.columns.drop(list(df_with_dummies.filter(regex='inexistent')))
+
+    remaining_indexes = df_with_dummies.columns.drop(list(df_with_dummies.filter(regex='inexistent|_NA')))
+
     df_with_dummies = df_with_dummies[remaining_indexes]
 
     return df_with_dummies
@@ -137,6 +156,9 @@ processed_X_full = dataframe_feature_engineering_dummies(train_na_filled, prepro
                                                          categorical_cols_matching_unique_count__range_4_15, is_train_data=True)
 processed_X_test = dataframe_feature_engineering_dummies(test_na_filled, preprocessor_test,
                                                          categorical_cols_matching_unique_count__range_4_15, is_train_data=False)
+
+processed_X_full.to_csv("train_proccesed_w_dummies.csv")
+processed_X_test.to_csv("test_processed_w_dummies.csv")
 # processed_X_full.columns = train_na_filled.columns
 # processed_X_test = pd.DataFrame(preprocessor_test.fit_transform(test_na_filled))
 # processed_X_test.columns = test_na_filled.columns
@@ -156,8 +178,8 @@ in_train_not_in_test.remove('SalePrice')
 processed_X_full.drop(columns=in_train_not_in_test, inplace=True)
 
 from sklearn.feature_selection import VarianceThreshold
-variance_threshold = 0.000
-if variance_threshold == 0.0 and False:
+variance_threshold = 0.001
+if variance_threshold > 0.0 :
     varianceThreshold = VarianceThreshold(variance_threshold)
     processed_X_full_selection_arr = varianceThreshold.fit_transform(processed_X_full)
     print("new shape ",processed_X_full_selection_arr.shape)
@@ -234,6 +256,9 @@ train = pd.DataFrame(minmax_scaler_train.transform(mat_train), columns=col_train
 # train = frame
 
 test = pd.DataFrame(minmax_scaler_test.transform(mat_test), columns=columns_from_test)
+
+# train.to_csv("train_minmax.csv")
+# test.to_csv("test_minmax.csv")
 
 random_state_nr = 42
 train = train.sample(frac=1, random_state=random_state_nr).reset_index(drop=True)
@@ -343,7 +368,7 @@ def manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
     i = 1
     kf = KFold(n_splits=4)  # , random_state=np.random.randint(10000*(9-i)))
     earlyStopping = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=patience)
-    customStopper = CustomStopper(monitor='val_loss', mode='min',verbose=0,patience=patience,start_epoch=200)
+    customStopper = CustomStopper(monitor='val_loss', mode='min',verbose=1,patience=patience,start_epoch=200)
     # print(tf.__version__)
     # print(tf.config.list_logical_devices())
     for train_index, test_index in kf.split(x_train_cross_val, y_train_cross_val):
@@ -485,17 +510,17 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 
     return gs
 
-epochs = 1400
+epochs = 1500
 batch_size = 80
 param_grid = {
-              'epochs':[1200,1400,1600],
-              'batch_size':[80,100],
+              'epochs':[1500],
+              'batch_size':[80],
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
               # 'activation' :          ['relu', 'elu']
              }
 
-do_manual_cv = True
+do_manual_cv = False
 fitted_model: Sequential
 #temporary code
 train_columns_length = len(feature_cols)
@@ -507,7 +532,7 @@ if do_manual_cv:
     train_with_stopping_rounds = False
     if train_with_stopping_rounds:
         fitted_model = manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
-                                                epochs=epochs, batch_size=batch_size, patience=150)
+                                                epochs=epochs, batch_size=batch_size, patience=200)
     else:
         fitted_model = manual_cv(x_train_cross_val, y_train_cross_val, model,
                                  epochs=epochs, batch_size=batch_size)

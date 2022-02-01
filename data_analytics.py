@@ -8,8 +8,30 @@ from Lot_Frontage_Filler import *
 from pandas_profiling import ProfileReport
 from features import *
 
-train_df = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
-test_df = pd.read_csv('../data/test.csv', index_col='Id',keep_default_na=False)
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+
+# train_df = pd.read_csv('../data/train.csv', index_col='Id')
+# test_df = pd.read_csv('../data/test.csv', index_col='Id')
+train_processed_file = "train_processed.csv"
+test_processed_file = "test_processed.csv"
+train_minmax_file = "train_minmax.csv"
+test_minmax_file = "test_minmax.csv"
+train_w_dummies_file = "train_proccesed_w_dummies.csv"
+test_w_dummies_file = "test_processed_w_dummies.csv"
+
+
+train_file = train_w_dummies_file
+test_file = test_w_dummies_file
+train_df = pd.read_csv(train_file)#, index_col='Id')
+test_df = pd.read_csv(test_file)#, index_col='Id')
+
+
+# VIF dataframe
+vif_data = pd.DataFrame()
+vif_data["feature"] = train_df.columns
+vif_data["VIF"] = [variance_inflation_factor(train_df.values, i)
+                          for i in range(len(train_df.columns))]
 
 # train_df = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
 # test_df = pd.read_csv('../data/test.csv', index_col='Id',keep_default_na=False)
@@ -20,22 +42,12 @@ test_df = pd.read_csv('../data/test.csv', index_col='Id',keep_default_na=False)
 # test_df[categorical_cols] = test_df[categorical_cols].replace(np.nan,'NA')
 
 columns = train_df.columns.to_list()
-columns_with_na_string = ['Alley','BsmtQual','BsmtCond','BsmtExposure','BsmtFinType1','BsmtFinType2',
-                          'FireplaceQu','GarageType','GarageFinish','GarageQual','GarageCond','PoolArea',
-                          'Fence','MiscFeature']
-columns_with_true_nans = [col for col in columns if col not in columns_with_na_string]
-train_df[columns_with_true_nans] = train_df[columns_with_true_nans].replace(to_replace = 'NA',value=np.nan)
-columns_with_true_nans.remove('SalePrice')
-test_df[columns_with_true_nans] = test_df[columns_with_true_nans].replace(to_replace = 'NA',value=np.nan)
 
-num_columns = len(train_df.columns)
-pd.set_option("display.max_columns", num_columns)
-train_df.head(30)
 profile_train = ProfileReport(train_df, title="Train Profiling Report",explorative=True)
 profile_test = ProfileReport(test_df, title="Test Profiling Report",explorative=True)
 
-profile_train.to_file("train_analysis.html")
-profile_test.to_file("test_analysis.html")
+profile_train.to_file(train_file + "_analysis.html")
+profile_test.to_file(test_file+"_analysis.html")
 print(profile_train)
 print(profile_test)
 
