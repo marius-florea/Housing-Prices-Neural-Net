@@ -37,8 +37,8 @@ def differentiate_NA_and_nans():
     train_original[columns_with_true_nans] = train_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
     columns_with_true_nans.remove('SalePrice')
     test_original[columns_with_true_nans] = test_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
-    train_original.to_csv("train_processed.csv")
-    test_original.to_csv("test_processed.csv")
+    train_original.to_csv("processed data/train_processed.csv")
+    test_original.to_csv("processed data/test_processed.csv")
 
 
 
@@ -46,8 +46,8 @@ def differentiate_NA_and_nans():
 # differentiate_NA_and_nans()
 na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A", "NULL", "NaN", "n/a", "nan", "null"]
 #these csv's can;t be read well in open office after the processing
-train_original = pd.read_csv('train_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
-test_original = pd.read_csv('test_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
+train_original = pd.read_csv('processed data/train_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
+test_original = pd.read_csv('processed data/test_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
 # columns_with_na_string = get_columns_with_true_nans()
 # train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
 # test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
@@ -157,8 +157,11 @@ processed_X_full = dataframe_feature_engineering_dummies(train_na_filled, prepro
 processed_X_test = dataframe_feature_engineering_dummies(test_na_filled, preprocessor_test,
                                                          categorical_cols_matching_unique_count__range_4_15, is_train_data=False)
 
-processed_X_full.to_csv("train_proccesed_w_dummies.csv")
-processed_X_test.to_csv("test_processed_w_dummies.csv")
+
+#TODO maybe remove at some point
+# processed_X_full.to_csv("processed data/train_proccesed_w_dummies.csv")
+# processed_X_test.to_csv("processed data/test_processed_w_dummies.csv")
+
 # processed_X_full.columns = train_na_filled.columns
 # processed_X_test = pd.DataFrame(preprocessor_test.fit_transform(test_na_filled))
 # processed_X_test.columns = test_na_filled.columns
@@ -520,7 +523,7 @@ param_grid = {
               # 'activation' :          ['relu', 'elu']
              }
 
-do_manual_cv = False
+do_manual_cv = True
 fitted_model: Sequential
 #temporary code
 train_columns_length = len(feature_cols)
@@ -578,7 +581,7 @@ def to_submit(pred_y, name_out):
     output = pd.DataFrame({'Id': test_original.index,
                            'SalePrice': y_predict.SalePrice})
 
-    output.to_csv(name_out+'.csv', index=False)
+    output.to_csv('csvs/'+name_out+'.csv', index=False)
 
 to_submit(y_predict,"submission")
 
