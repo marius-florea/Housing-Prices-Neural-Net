@@ -7,25 +7,11 @@ import numpy as np
 from Lot_Frontage_Filler import *
 from pandas_profiling import ProfileReport
 from features import *
-
+from data_analytics_utils import *
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 
-# train_df = pd.read_csv('../data/train.csv', index_col='Id')
-# test_df = pd.read_csv('../data/test.csv', index_col='Id')
-train_processed_file = "train_processed.csv"
-test_processed_file = "test_processed.csv"
-train_minmax_file = "train_minmax.csv"
-test_minmax_file = "test_minmax.csv"
-train_w_dummies_file = "train_proccesed_w_dummies.csv"
-test_w_dummies_file = "test_processed_w_dummies.csv"
-
-
-train_file = train_w_dummies_file
-test_file = test_w_dummies_file
-train_df = pd.read_csv(train_file)#, index_col='Id')
-test_df = pd.read_csv(test_file)#, index_col='Id')
-
+(train_df, test_df) = load_dataFrame_from_csv(train_w_dummies_csv_file, test_w_dummies_csv_file)
 
 # VIF dataframe
 vif_data = pd.DataFrame()
@@ -33,9 +19,23 @@ vif_data["feature"] = train_df.columns
 vif_data["VIF"] = [variance_inflation_factor(train_df.values, i)
                           for i in range(len(train_df.columns))]
 
+selection_vif = vif_data[vif_data["VIF"] > 100]
+selection_vif = selection_vif.sort_values(by='VIF',ascending=False)
 # train_df = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
 # test_df = pd.read_csv('../data/test.csv', index_col='Id',keep_default_na=False)
+train_df_reduced = train_df.copy()
+#'BsmtUnfSF'
+labels_with_high_vif = ['BsmtFinSF2', 'TotalBsmtSF','2ndFlrSF', 'YearBuilt', 'YearRemodAdd', ]  #34 YrSold 57832.71
+labels_with_high_vif = labels_with_high_vif + ['YrSold','GarageYrBlt''Neighborhood']
+#MSZoning_RL RoofStyle_Gable ExterCond_TA Functional_Typ GarageType_Attchd GarageCond_TA
 
+train_df_reduced.drop(labels=labels_with_high_vif, axis=1, inplace=True)
+vif_on_reduced_dataFrame = pd.DataFrame()
+vif_on_reduced_dataFrame["feature"] = train_df_reduced.columns
+vif_on_reduced_dataFrame["VIF"] = [variance_inflation_factor(train_df_reduced.values, i)
+                          for i in range(len(train_df_reduced.columns))]#TODO check how this syntax works
+selection_reduced_vif = vif_on_reduced_dataFrame[vif_on_reduced_dataFrame["VIF"] > 100]
+selection_reduced_vif = selection_reduced_vif.sort_values(by='VIF',ascending=False)
 
 # categorical_cols = get_categorical_features_from_df(train_df)
 # train_df[categorical_cols] = train_df[categorical_cols].replace(np.nan,'NA')

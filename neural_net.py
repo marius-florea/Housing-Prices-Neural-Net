@@ -15,32 +15,9 @@ import matplotlib
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from processing_utils import *
-from features import *
 from utils import *
-from Lot_Frontage_Filler import *
 import numpy as np
-def get_features_with_nr_of_nulls_larger_than(nrOfNulls: int):
-    m = train_original.eq('NA').sum()
-    nulls_in_train_df = train_original.eq('NA').sum()
-    nulls_in_test_df = test_original.eq('NA').sum()
-    train_labels = nulls_in_train_df[nulls_in_train_df > nrOfNulls].index.values
-    test_labels = nulls_in_test_df[nulls_in_test_df > nrOfNulls].index.values
-    intersection = np.intersect1d(test_labels,train_labels)
-    return intersection
-
-def differentiate_NA_and_nans():
-    # differentiating NA from nan code - move to a function
-    train_original = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
-    test_original = pd.read_csv('../data/test.csv', index_col='Id', keep_default_na=False)
-    columns_with_true_nans = get_columns_with_true_nans(train_original)
-    train_original[columns_with_true_nans] = train_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
-    columns_with_true_nans.remove('SalePrice')
-    test_original[columns_with_true_nans] = test_original[columns_with_true_nans].replace(to_replace='NA',value=np.nan)
-    train_original.to_csv("processed data/train_processed.csv")
-    test_original.to_csv("processed data/test_processed.csv")
-
-
+from preprocessing_dataframes import *
 
 # train_original = remove_rows_with_nans(train_original)
 # differentiate_NA_and_nans()
@@ -48,115 +25,8 @@ na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan
 #these csv's can;t be read well in open office after the processing
 train_original = pd.read_csv('processed data/train_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
 test_original = pd.read_csv('processed data/test_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
-# columns_with_na_string = get_columns_with_true_nans()
-# train_original[columns_with_na_string] = train_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
-# test_original[columns_with_na_string] = test_original[columns_with_na_string].replace(value='NA', to_replace=np.nan)
-nrOfNulls = 1150
-features_with_many_nulls = get_features_with_nr_of_nulls_larger_than(nrOfNulls) #TODO with these features removed the score got worse!!!
-high_correlated_features = ['GarageCars','GarageYrBlt','TotRmsAbvGrd','TotalBsmtSF','BedroomAbvGr','BsmtFullBath']
-features_to_remove = np.append(high_correlated_features,features_with_many_nulls)
-#TODO uncomment to drop features to be removed
-# train_original.drop(labels=features_to_remove, axis=1, inplace=True)
-# test_original.drop(labels=features_to_remove, axis=1, inplace=True)
 
-fill_Lot_Frontage_Nans(train_original)
-fill_Lot_Frontage_Nans(test_original)
-
-train_nunique = train_original.nunique()
-test_nunique = test_original.nunique()
-
-# test = test_original.select_dtypes(exclude=['object'])
-# test.fillna(0,inplace=True)
-
-y_list =['SalePrice']
-Y_train_original = train_original[y_list]
-# train_original.drop(['SalePrice'], axis=1, inplace=True)
-
-numerical_cols = get_numerical_features_from_df_with_margin(train_original)#get_high_corelated_numerical_features()
-categorical_cols_unique_range_4_15 = get_categorical_features_from_df_in_range(train_original,minValue=4,maxValue=15)#get_choosen_categorical_features()
-categorical_cols_unique_over_15 = get_categorical_features_from_df_above_upper_margin(train_original, maxValue=15)
-
-
-categorical_cols_matching_unique_count__range_4_15 = []
-categorical_cols_nonmatching_unique_count__range_4_15 = []
-for col in categorical_cols_unique_range_4_15:
-    if train_original[col].nunique() == test_original[col].nunique():
-        categorical_cols_matching_unique_count__range_4_15.append(col)
-    else:
-        # categorical_cols_matching_unique_count__range_4_15.append(col) #Temporary !! replace with line below
-        categorical_cols_nonmatching_unique_count__range_4_15.append(col)
-
-my_cols = numerical_cols + categorical_cols_matching_unique_count__range_4_15 + \
-          categorical_cols_nonmatching_unique_count__range_4_15 \
-          + categorical_cols_unique_over_15
-
-my_cols_with_saleprice = my_cols + ['SalePrice']
-
-
-train_na_filled = train_original.copy()
-train_na_filled[numerical_cols] = train_na_filled[numerical_cols].fillna(-1)#see if does same as line below
-test_na_filled = test_original.copy()
-test_na_filled[numerical_cols] = test_na_filled[numerical_cols].fillna(-1)
-
-
-#commentig the bellow line gives even a better score wtf?
-train_na_filled = train_na_filled.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('inexistent'))
-test_na_filled = test_na_filled.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('inexistent'))
-
-#kept only the selected columns adica my_cols_with_salesprice
-train_na_filled = train_na_filled[my_cols_with_saleprice].copy()
-test_na_filled = test_na_filled[my_cols].copy()
-
-
-# numerical_cols.remove('MSSubClass')#temporary move somewhere elese or not?
-# categorical_cols.remove('MSZoning')
-categorical_cols_unique_over_15_and_nonmatching_uniques= categorical_cols_unique_over_15 + categorical_cols_nonmatching_unique_count__range_4_15
-preprocessor_train = get_preprocessor(numerical_cols, categorical_cols_matching_unique_count__range_4_15,
-                                      categorical_cols_unique_over_15_and_nonmatching_uniques, y_list)
-preprocessor_test = get_preprocessor(numerical_cols, categorical_cols_matching_unique_count__range_4_15,
-                                     categorical_cols_unique_over_15_and_nonmatching_uniques)
-
-def dataframe_feature_engineering(df:pd.DataFrame, preprocessor:ColumnTransformer ,is_train_data=True):
-    preprocessor.fit(df)
-    pipe = preprocessor.transformers_[2]
-    one_hot_encoder_pipe = pipe[1][-1:]
-    cols_for_one_hot_encodeding = get_one_hot_encoded_cols()
-    one_h_encoded_cols = one_hot_encoder_pipe.get_feature_names_out(cols_for_one_hot_encodeding)
-    df_arr = preprocessor.transform(df)
-    df_new_columns = df.columns
-    if is_train_data:
-        df_new_columns = df_new_columns.drop(cols_for_one_hot_encodeding, )
-        df_new_columns = df_new_columns.drop(['SalePrice'])
-        column_names = np.concatenate([df_new_columns, one_h_encoded_cols,y_list])
-    else:
-        df_new_columns = df_new_columns.drop(cols_for_one_hot_encodeding)
-        column_names = np.concatenate([df_new_columns, one_h_encoded_cols])
-
-    new_df = pd.DataFrame(df_arr, columns=column_names)
-    return new_df
-
-def dataframe_feature_engineering_dummies(df:pd.DataFrame,preprocessor:ColumnTransformer,
-                                          categorical_cols_definded_range,is_train_data=True):
-    df_arr = preprocessor.fit_transform(df)
-    if is_train_data:
-        new_df = pd.DataFrame(df_arr, columns=my_cols_with_saleprice)
-    else:
-        new_df = pd.DataFrame(df_arr, columns=my_cols)
-    df_with_dummies = pd.get_dummies(new_df,columns=categorical_cols_definded_range)
-
-
-    remaining_indexes = df_with_dummies.columns.drop(list(df_with_dummies.filter(regex='inexistent|_NA')))
-
-    df_with_dummies = df_with_dummies[remaining_indexes]
-
-    return df_with_dummies
-
-# processed_X_full = dataframe_feature_engineering(train_na_filled, preprocessor_train, categorical_cols_unique_range_4_15 )
-processed_X_full = dataframe_feature_engineering_dummies(train_na_filled, preprocessor_train,
-                                                         categorical_cols_matching_unique_count__range_4_15, is_train_data=True)
-processed_X_test = dataframe_feature_engineering_dummies(test_na_filled, preprocessor_test,
-                                                         categorical_cols_matching_unique_count__range_4_15, is_train_data=False)
-
+processed_X_full, processed_X_test = load_and_preprocess_dataframes(train_original, test_original)
 
 #TODO maybe remove at some point
 # processed_X_full.to_csv("processed data/train_proccesed_w_dummies.csv")
@@ -286,56 +156,24 @@ y_label = train.SalePrice
 
 #Train and Test
 
-from tensorflow.keras.models import  Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import *
-from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-from tensorflow.keras.losses import *
+# from tensorflow.keras.models import  Sequential
+# from tensorflow.keras.layers import Dense
+# from tensorflow.keras.layers import *
+# from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+# from tensorflow.keras.losses import *
 
-#model
-# dropout_rate0 = 0.05
-# dropout_rate1 = 0.2
-dropout_rate2 = 0.05
-dropout_rate3 = 0.1
 
 import time
 # ts stores the time in seconds
 ts = time.time()
 textfile_name = "Loses/"+str(ts) + ".txt"
 
-from tensorflow.keras import regularizers
 import tensorflow as tf
 
 def root_mean_squared_error(y_true, y_pred):
     return tf.math.sqrt(tf.math.reduce_mean(tf.math.square(y_pred - y_true)))
 
-def model_function(input_dimension,optimizer="adam",instantiate=False):
-    def create_model():
-        l1 = 9*1e-4
-        l2 = 5*1e-4
-        kernel_initializer = 'glorot_uniform'
-        model = Sequential()
-        # input_shape = (input_dim,1)
-        model.add(Dense(input_dimension,input_dim=input_dimension, kernel_initializer=kernel_initializer, activation='relu'))
-
-        #uncomment --->
-        model.add(Dropout(dropout_rate2))
-        model.add(Dense(100, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dropout(dropout_rate2))
-        model.add(Dense(65, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dropout(dropout_rate2))
-        # <---- uncomment
-
-        # model.add(Dense(50, kernel_initializer=kernel_initializer,kernel_regularizer=regularizers.l1_l2(l1=l1,l2=l2), activation='relu'))
-        model.add(Dense(1, kernel_initializer=kernel_initializer))
-        #compile model
-        model.compile(metrics=['accuracy'],loss='binary_crossentropy',optimizer=optimizer)
-        return model
-    function = create_model() if instantiate else create_model
-    return function
-
-
-
+from nn_model import *
 from sklearn.model_selection import KFold
 from sklearn.model_selection import StratifiedKFold
 strat_kfold = StratifiedKFold()
@@ -397,10 +235,9 @@ def manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
     print(train_loses_string)
     print(cv_losses_string)
 
-    textfile = open(textfile_name, "w")
+    textfile = open(textfile_name, "a")
     textfile.writelines([train_loses_string, "\n", cv_losses_string])
     textfile.writelines(["\n cv_loss mean", str(cv_losses_mean)])
-    textfile.writelines(["\n epochs", str(epochs)])
     textfile.writelines(["\n uniqeue margin", str(unique_margin)])
     textfile.writelines(["\n variance threshold", str(variance_threshold)])
     textfile.close()
@@ -494,13 +331,14 @@ from sklearn.model_selection import GridSearchCV
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
 from sklearn.metrics import make_scorer
 
-def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=root_mean_squared_error):
+def grid_cv(x_train_cross_val,y_train_cross_val,param_grid,learning_rate , cv=5,scoring_fit=root_mean_squared_error):
     with open(textfile_name, 'a') as f:
         f.write("\n manual_cv ")
 
     scorer = make_scorer(scoring_fit, greater_is_better=False)
     input_dim = len(feature_cols)
-    kerasRegressor = KerasRegressor(build_fn=model_function(input_dimension=input_dim))
+    kerasRegressor = KerasRegressor(build_fn=model_function_large(input_dimension=input_dim,
+                                                                  learning_rate=learning_rate))
     gs = GridSearchCV(estimator=kerasRegressor,
                       param_grid=param_grid,
                       cv=cv,
@@ -513,37 +351,46 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid, cv=5,scoring_fit=roo
 
     return gs
 
-epochs = 1500
+epochs = 3500
 batch_size = 80
+learning_rate = 0.0015
+input_dim = len(feature_cols)
+
 param_grid = {
-              'epochs':[1500],
+              'epochs':[1200,1500],
               'batch_size':[80],
+              'learning_rate': [0.0015,0.002],
+              'input_dimension':[input_dim]
               # 'optimizer':['Adam']
               # 'dropout_rate' : [0.0, 0.1, 0.2],
               # 'activation' :          ['relu', 'elu']
              }
 
-do_manual_cv = True
+do_manual_cv = False
 fitted_model: Sequential
 #temporary code
 train_columns_length = len(feature_cols)
 length = train_columns_length if train_columns_length > test_columns_length else test_columns_length
 
 if do_manual_cv:
-    input_dim = len(feature_cols)
-    model = model_function(input_dimension=input_dim,instantiate=True)
-    train_with_stopping_rounds = False
+    with open(textfile_name, 'a') as f:
+        print("bosss",textfile_name)
+        ret = f.write("\n epochs " + str(epochs) + " batch_size " + str(batch_size) + " learning_rate " + str(learning_rate))
+        print("return from write to file",ret)
+    model = model_function_large(input_dimension=input_dim ,learning_rate=learning_rate ,instantiate=True)
+    train_with_stopping_rounds = True
     if train_with_stopping_rounds:
         fitted_model = manual_cv_with_tfdataset(x_train_cross_val, y_train_cross_val, model,
-                                                epochs=epochs, batch_size=batch_size, patience=200)
+                                                epochs=epochs, batch_size=batch_size, patience=250)
     else:
         fitted_model = manual_cv(x_train_cross_val, y_train_cross_val, model,
                                  epochs=epochs, batch_size=batch_size)
 
     y_prediction_for_holdout_set = fitted_model.predict(np.array(x_holdout_set))
 else:
-    gs = grid_cv(x_train_cross_val,y_train_cross_val,param_grid,cv=5)
+    gs = grid_cv(x_train_cross_val,y_train_cross_val,param_grid, learning_rate=learning_rate,cv=5)
     with open(textfile_name, 'a') as f:
+        f.write("\n learning rate" + str(learning_rate))
         f.write("\n gs best params"+str(gs.best_params_))
         f.write("\n gs best score"+str(gs.best_score_))
     model = gs.estimator.build_fn()

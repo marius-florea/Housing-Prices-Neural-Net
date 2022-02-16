@@ -1,20 +1,26 @@
 import numpy as np
 import pandas as pd
+from data_analytics_utils import *
 
-train_processed_file = "train_processed.csv"
-test_processed_file = "test_processed.csv"
-# train_minmax_file = "train_minmax.csv"
-# test_minmax_file = "test_minmax.csv"
+def print_nulls_in_dframes():
+    nulls_in_train_df = train_df.isnull().sum()
+    print(nulls_in_train_df)
+    nulls_in_test_df = test_df.isnull().sum()
+    print(nulls_in_test_df)
 
-train_file = train_processed_file
-test_file = test_processed_file
-train_df = pd.read_csv(train_file)#, index_col='Id')
-test_df = pd.read_csv(test_file)#, index_col='Id')
+(train_df,test_df) = load_dataFrame_from_csv(train_processed_file, test_processed_file)
+# print_nulls_in_dframes()
 
-nulls_in_train_df = train_df.isnull().sum()
-print(nulls_in_train_df)
-nulls_in_test_df = test_df.isnull().sum()
-print(nulls_in_test_df)
+salePrice = train_df['SalePrice']
+cols = train_df.columns
+cols = cols.drop('SalePrice')
+absCorrelations = []
+for column in cols:
+    correlation = abs(salePrice.corr(train_df[column]))
+    absCorrelations.append((column, correlation))
+
+absCorrelations.sort(key=lambda y: y[1])
+
 
 corr_matrix = train_df.corr().abs()
 
