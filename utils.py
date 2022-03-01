@@ -1,4 +1,7 @@
 import pandas as pd
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
 def remove_rows_with_nans(df:pd.DataFrame,nan_count=10):
     nan_values_per_row = {}
     for index,row in df.iterrows():
@@ -11,3 +14,7 @@ def remove_rows_with_nans(df:pd.DataFrame,nan_count=10):
     df = df.drop(indexes_with_more_than_x_nans)
 
     return df
+
+def rmse(y_holdout_set,y_prediction_for_holdout_set):
+    rmse = np.sqrt(mean_squared_error(y_holdout_set, y_prediction_for_holdout_set))
+    return rmse

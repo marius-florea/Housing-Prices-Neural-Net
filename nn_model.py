@@ -12,7 +12,7 @@ from tensorflow.keras import regularizers
 dropout_rate2 = 0.05
 dropout_rate3 = 0.1
 
-def model_function(input_dimension,optimizer=keras.optimizers.Adam(lr=0.002),instantiate=False):
+def model_function(input_dimension,optimizer=keras.optimizers.Adam(learning_rate=0.002),instantiate=False):
     def create_model():
         l1 = 9*1e-4
         l2 = 5*1e-4

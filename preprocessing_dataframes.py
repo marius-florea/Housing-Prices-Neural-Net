@@ -13,7 +13,7 @@ def get_features_with_nr_of_nulls_larger_than(train_original,test_original,nrOfN
     intersection = np.intersect1d(test_labels,train_labels)
     return intersection
 
-def differentiate_NA_and_nans():
+def differentiate_NA_and_nans_and_store_to_csv():
     # differentiating NA from nan code - move to a function
     train_original = pd.read_csv('../data/train.csv', index_col='Id', keep_default_na=False)
     test_original = pd.read_csv('../data/test.csv', index_col='Id', keep_default_na=False)

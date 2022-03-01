@@ -19,12 +19,23 @@ from utils import *
 import numpy as np
 from preprocessing_dataframes import *
 
+import xgboost as xgb
+from xgboost import XGBRegressor
+from xgboost import DMatrix
+from sklearn.model_selection import cross_val_score
+import sklearn.metrics as sklearn_metrics
+from xgb_gridsearch import *
+
 # train_original = remove_rows_with_nans(train_original)
-# differentiate_NA_and_nans()
-na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A", "NULL", "NaN", "n/a", "nan", "null"]
-#these csv's can;t be read well in open office after the processing
-train_original = pd.read_csv('processed data/train_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
-test_original = pd.read_csv('processed data/test_processed.csv', index_col='Id',na_values=na_values, keep_default_na=False)
+
+# differentiate_NA_and_nans_and_store_to_csv()
+# na_values = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND", "1.#QNAN", "<NA>", "N/A", "NULL", "NaN", "n/a", "nan", "null"]
+# #these csv's can;t be read well in open office after the processing
+# train_original = pd.read_csv('processed data/train_processed.csv', index_col='Id')#,na_values=na_values, keep_default_na=False)
+# test_original = pd.read_csv('processed data/test_processed.csv', index_col='Id')#,na_values=na_values, keep_default_na=False)
+
+train_original = pd.read_csv('../data/train.csv', index_col='Id')
+test_original = pd.read_csv('../data/test.csv', index_col='Id')
 
 processed_X_full, processed_X_test = load_and_preprocess_dataframes(train_original, test_original)
 
@@ -333,7 +344,7 @@ from sklearn.metrics import make_scorer
 
 def grid_cv(x_train_cross_val,y_train_cross_val,param_grid,learning_rate , cv=5,scoring_fit=root_mean_squared_error):
     with open(textfile_name, 'a') as f:
-        f.write("\n manual_cv ")
+        f.write("\n grid_cv ")
 
     scorer = make_scorer(scoring_fit, greater_is_better=False)
     input_dim = len(feature_cols)
@@ -351,9 +362,10 @@ def grid_cv(x_train_cross_val,y_train_cross_val,param_grid,learning_rate , cv=5,
 
     return gs
 
-epochs = 3500
+
+epochs = 1200
 batch_size = 80
-learning_rate = 0.0015
+learning_rate = 0.002
 input_dim = len(feature_cols)
 
 param_grid = {
@@ -366,13 +378,17 @@ param_grid = {
               # 'activation' :          ['relu', 'elu']
              }
 
-do_manual_cv = False
+do_manual_cv = 1
+do_grid_cv = 2
+do_xgb = 3
+regression_method = do_xgb
+
 fitted_model: Sequential
 #temporary code
 train_columns_length = len(feature_cols)
 length = train_columns_length if train_columns_length > test_columns_length else test_columns_length
 
-if do_manual_cv:
+if regression_method == do_manual_cv:
     with open(textfile_name, 'a') as f:
         print("bosss",textfile_name)
         ret = f.write("\n epochs " + str(epochs) + " batch_size " + str(batch_size) + " learning_rate " + str(learning_rate))
@@ -387,36 +403,140 @@ if do_manual_cv:
                                  epochs=epochs, batch_size=batch_size)
 
     y_prediction_for_holdout_set = fitted_model.predict(np.array(x_holdout_set))
-else:
+    loss_on_holdout = rmse(y_holdout_set,y_prediction_for_holdout_set)
+
+elif regression_method == do_grid_cv:
     gs = grid_cv(x_train_cross_val,y_train_cross_val,param_grid, learning_rate=learning_rate,cv=5)
     with open(textfile_name, 'a') as f:
         f.write("\n learning rate" + str(learning_rate))
         f.write("\n gs best params"+str(gs.best_params_))
         f.write("\n gs best score"+str(gs.best_score_))
-    model = gs.estimator.build_fn()
+    model = gs.best_estimator_.model
     y_prediction_for_holdout_set = gs.predict(np.array(x_holdout_set))
+    loss_on_holdout = rmse(y_holdout_set,y_prediction_for_holdout_set)
+
+elif regression_method == do_xgb:
+    print("xgb",xgb.__version__)
+    # model = XGBRegressor(n_estimators=1300, learning_rate=0.25, verbosity=1)
+    # print(sklearn_metrics.SCORERS.keys())
+    # results = cross_val_score(model, x_train_cross_val, y_train_cross_val, cv=5, scoring="neg_root_mean_squared_error", n_jobs=-1)
+    # model.val
+    # param = {'max_depth': 6, 'eta': 0.3, 'objective': 'eg:squarederror'r}
+    # num_round = 10
+    # dtrain = xgb.DMatrix(data=x_train_cross_val, label=y_train_cross_val)
+    #
+    # xgb.cv(param, dtrain, num_round, nfold=5,
+    #        metrics={'error'}, seed=42,
+    #        callbacks=[xgb.callback.EvaluationMonitor(show_stdv=True),
+    #                   xgb.callback.EarlyStopping(100)])
+    #
+    # dmatrix_holdout_set_x = DMatrix(data=x_holdout_set)
+    # y_prediction_for_holdout_set = xgb.Booster().predict(data=dmatrix_holdout_set_x)
+    kfold = KFold(n_splits=5)
+    # initial hyperparams
+    current_params = {
+        'max_depth': 6,
+        'min_child_weight': 4,
+        'verbosity': 0,
+    }
+
+    learning_rates = [0.005, 0.008, 0.01, 0.015]#np.logspace(-3, -1, 5)
+    grid_search_dicts = [{'learning_rate': lr} for lr in learning_rates]
+    # merge into full param dicts
+    full_search_dicts = [{**current_params, **d} for d in grid_search_dicts]
+
+    current_best_params, results_df=get_params_xgb_gridsearch_with_kfold(x_train_cross_val,y_train_cross_val,
+                                                         full_search_dicts,kfold,
+                                                         x_holdout_set,y_holdout_set
+                                                         )
+
+    # round 2: tune subsample, colsample_bytree, colsample_bylevel
+
+    subsamples = [0.5]#np.linspace(0.25, 0.75, 11)
+    colsample_bytrees = [0.6, 0.7, 0.8] #np.linspace(0.1, 0.3, 5)
+    colsample_bylevel = [0.6, 0.7, 0.8] #np.linspace(0.1, 0.3, 5)
+    # subsamples = np.linspace(0.4, 0.9, 11)
+    # colsample_bytrees = np.linspace(0.05, 0.25, 5)
+
+    grid_search_dicts = [dict(zip(['subsample', 'colsample_bytree', 'colsample_bylevel'], [a, b, c]))
+                         for a, b, c in product(subsamples, colsample_bytrees, colsample_bylevel)]
+    # merge into full param dicts
+    full_search_dicts = [{**current_best_params, **d} for d in grid_search_dicts]
+
+    current_best_params, results_df = get_params_xgb_gridsearch_with_kfold(x_train_cross_val, y_train_cross_val,
+                                                                           full_search_dicts, kfold,
+                                                                           x_holdout_set, y_holdout_set
+                                                                           )
+
+
+
+
+    loss_on_holdout = results_df.iloc[0]['rmse_on_holdout']
+
+    max_depth = current_best_params["max_depth"]
+    learning_rate = current_best_params["learning_rate"]
+    subsample = current_best_params["subsample"]
+    colsample_bytree = current_best_params["colsample_bytree"]
+    colsample_bylevel = current_best_params["colsample_bylevel"]
+
+    model = XGBRegressor(
+        objective='reg:squarederror',
+        n_estimators=BOOST_ROUNDS,
+        random_state=RANDOMSTATE,
+        verbosity=1,
+        n_jobs=-1,
+        booster='gbtree',
+        max_depth=max_depth,
+        learning_rate=learning_rate,
+        colsample_bytree=colsample_bytree,
+        colsample_bylevel=colsample_bylevel,
+        min_child_weight=4,
+        subsample=subsample
+    )
+
+    print("xgbregressor params ",model.get_params())
+
+    fitted_model=model.fit(training_set_selection,y_label,
+                           eval_set=[(x_holdout_set, y_holdout_set)],
+                           eval_metric=EVAL_METRIC, early_stopping_rounds=EARLY_STOPPING_ROUNDS,
+                           verbose=False)
+    # y_prediction_for_holdout_set = xgb_gridsearch_model.predict(x_holdout_set)
+    # model = xgb_gridsearch_model.best_estimator_ #TODO see above and in code which model should be used
+
+
+
+    # print(y_prediction_for_holdout_set)
+
+    print("penis")
+
 
 # loss = fitted_model.evaluate(np.array(x_test), np.array(y_test))
 # loss = mean_absolute_error(np.array(y_test),y_prediction_test)
-loss = binary_crossentropy(np.array(y_holdout_set), y_prediction_for_holdout_set)
 loss_on_holdoutset_text = ""
-if do_manual_cv:
-    loss_manual = loss.numpy().mean()
-    loss_on_holdoutset_text = "manualcv loss on the hold out final test set:" + str(loss_manual)
-else:
-    loss_on_holdoutset_text = "gridsearchcv loss on the hold out final test set:" + str(loss)
+if regression_method==do_manual_cv:
+    loss_on_holdoutset_text = "manualcv loss on the hold out final test set:" + str(loss_on_holdout)
+elif regression_method==do_grid_cv:
+    loss_on_holdoutset_text = "gridsearchcv loss on the hold out final test set:" + str(loss_on_holdout)
+elif regression_method==do_xgb:
+    loss_on_holdoutset_text = "xgb custom_cv_w_stopping loss on the hold out final test set:" + str(loss_on_holdout)
+
 
 print(loss_on_holdoutset_text)
 with open(textfile_name,'a') as f:
     f.write("\n"+loss_on_holdoutset_text+"\n")
-    model.summary(print_fn=lambda x: f.write(x + '\n'))
+    if not do_xgb:
+        model.summary(print_fn=lambda x: f.write(x + '\n'))
+    else:
+        f.write(str(model.get_params()))
 
 
 # prediction for sumbmission
-if do_manual_cv:
+if regression_method==do_manual_cv:
     y_predict = fitted_model.predict(np.array(test))
-else:
+elif regression_method==do_grid_cv:
     y_predict = gs.predict(np.array(test))
+elif regression_method==do_xgb:
+    y_predict = fitted_model.predict(test)
 
 
 def to_submit(pred_y, name_out):
